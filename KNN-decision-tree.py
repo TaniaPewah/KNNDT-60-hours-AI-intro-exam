@@ -122,7 +122,13 @@ def get_subtable(data, attr_index, value):
     returned = np.vstack((col_names, returned))
     return returned
 
-def buildTree(data, tree=None):
+def epsilon_range_mistake( branch_data, epsilon, K ):
+    for row in branch_data:
+        print("here")
+    return True
+
+
+def buildTree(data, K, M, epsilon):
 
     #TODO check its NP
     #Create a list of results for the training data example classes
@@ -131,21 +137,10 @@ def buildTree(data, tree=None):
     # If all training data belongs to a category, return to the category
     if classList.count(classList[0]) == len(classList):   return classList[0]
 
-
     # Get attribute with maximum information gain
     attr_indx, limit_val = find_winner(data)
 
     lower, higher = classify_vals_transposed(data, attr_indx, limit_val)
-
-    # feat_values = [example[attr_indx] for example in data]
-    # unique_attr_vals = set(feat_values)
-    # Get distinct value of that attribute e.g Salary is node and Low, Med and High are values
-    #attValues = np.unique(transposed[attr_indx])
-
-    # Create an empty dictionary to create tree
-    # if tree is None:
-    #     tree = {}
-    #     tree[attr_indx] = {}
 
     myTree = {attr_indx: {}}
 
@@ -155,16 +150,17 @@ def buildTree(data, tree=None):
         myTree[attr_indx][0] = limit_val, None
         print("lower: ", attr_indx, " empty leaf ")
     else:
+
         class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
 
         # if all lower are same class - its a leaf, save all lower examples in the leaf
-        if len(class_vals_l) == 1:
+        if len(class_vals_l) == 1 or epsilon_range_mistake(lower, epsilon, K) or len(lower) <= M*K:
             myTree[attr_indx][0] = limit_val, lower
             print("lower: ", attr_indx, " ", len(lower))
 
         # keep building the tree
         else:
-            myTree[attr_indx][0] = limit_val, buildTree(lower)
+            myTree[attr_indx][0] = limit_val, buildTree(lower, K, M, epsilon)
 
     if len(higher) == 0:
         myTree[attr_indx][1] = limit_val, None
@@ -173,73 +169,22 @@ def buildTree(data, tree=None):
         class_vals_h, counts_h = np.unique(higher[:, -1], return_counts=True)
 
         # if all higher are same class - its a leaf, save all higher examples in the leaf
-        if len(class_vals_h) == 1:
+        if len(class_vals_h) == 1 or epsilon_range_mistake(higher, epsilon, K) or len(higher) <= M * K:
             myTree[attr_indx][1] = limit_val, higher
             print("higher: ", attr_indx, " ", len(higher))
 
         # keep building the tree
         else:
-            myTree[attr_indx][1] = limit_val, buildTree(higher)
+            myTree[attr_indx][1] = limit_val, buildTree(higher, K, M, epsilon)
 
     return myTree
-
-
-
-
-
-
-
-
-
-
-
-    # We make loop to construct a tree by calling this function recursively.
-    # In this we check if the subset is pure and stops if it is pure.
-    # print("bla---------------------")
-    # for value in unique_attr_vals:
-    #
-    #    #root = DTNode(parent, p, n, 'testNode', attributeName=attribute, attributeIndex=attrIndex)
-    #
-    #     subtable = get_subtable(data, attr_indx, value)
-    #     clValue, counts = np.unique(subtable.transpose()[0][1:], return_counts=True)
-    #
-    #     majority = 0
-    #     # TODO check leaf creation
-    #     if( majority ):
-    #         zero_diagnosis = counts[int(clValue[0])]
-    #         other_diagnosis = counts[int(clValue[1])]
-    #         if (zero_diagnosis > other_diagnosis):
-    #             majority = clValue[0]
-    #             myTree[attr_indx][value] = limit_val, majority
-    #         else:
-    #             majority = clValue[1]
-    #             myTree[attr_indx][value] = limit_val, majority
-    #         return tree
-    #
-    #     if len(counts) == 1:   # Checking purity of subset
-    #         myTree[attr_indx][value] = limit_val, clValue[0]
-    #         print("creating leaf")
-    #     else:
-    #         print("building tree")
-    #         #add coulumn names to subtable
-    #         zero_diagnosis = counts[int(clValue[0])]
-    #         other_diagnosis = counts[int(clValue[1])]
-    #         if (zero_diagnosis > other_diagnosis):
-    #             majority = clValue[0]
-    #         else:
-    #             majority = clValue[1]
-    #
-    #         myTree[attr_indx][value] = limit_val, majority, buildTree(subtable)  # Calling the function recursively
-
-
-
 
 
 df = pd.read_csv('train_9.csv')
 df_array = df.to_numpy()
 
 #entropy = find_entropy(df_array)
-tree = buildTree(df_array )
+tree = buildTree(df_array, K, M, epsilon )
 
 print(tree)
 print(tree)
