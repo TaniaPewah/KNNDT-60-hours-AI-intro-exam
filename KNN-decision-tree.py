@@ -34,11 +34,18 @@ def find_winner(data):
 
 
 def classify_vals_transposed(data, attr_index, limit_val):
-    data = data[1:]
-    transposed = data.transpose()
-    for index, var in enumerate(transposed[attr_index]):
-        transposed[attr_index][index] = 0 if limit_val > var else 1
-    return transposed
+
+    lower = []
+    higher = []
+
+    # for every row
+    for index, row in enumerate(data):
+
+        if row[attr_index] < limit_val:
+            lower.append(row)
+        else :
+            higher.append(row)
+    return np.array(lower), np.array(higher)
 
 
 def get_subtable(data, attr_index, value):
@@ -63,10 +70,10 @@ def buildTree(data , depth, tree=None):
     #TODO check if needed
     attr_indx += 1
 
-    transposed = classify_vals_transposed(data, attr_indx, limit_val)
+    lower, higher = classify_vals_transposed(data, attr_indx, limit_val)
 
-    feat_values = [example[attr_indx] for example in data]
-    unique_attr_vals = set(feat_values)
+    # feat_values = [example[attr_indx] for example in data]
+    # unique_attr_vals = set(feat_values)
     # Get distinct value of that attribute e.g Salary is node and Low, Med and High are values
     #attValues = np.unique(transposed[attr_indx])
 
@@ -80,41 +87,41 @@ def buildTree(data , depth, tree=None):
 
     # We make loop to construct a tree by calling this function recursively.
     # In this we check if the subset is pure and stops if it is pure.
-    print("bla---------------------")
-    for value in unique_attr_vals:
-
-       #root = DTNode(parent, p, n, 'testNode', attributeName=attribute, attributeIndex=attrIndex)
-
-        subtable = get_subtable(data, attr_indx, value)
-        clValue, counts = np.unique(subtable.transpose()[0][1:], return_counts=True)
-
-        majority = 0
-        # TODO check leaf creation
-        if( majority ):
-            zero_diagnosis = counts[int(clValue[0])]
-            other_diagnosis = counts[int(clValue[1])]
-            if (zero_diagnosis > other_diagnosis):
-                majority = clValue[0]
-                myTree[attr_indx][value] = limit_val, majority
-            else:
-                majority = clValue[1]
-                myTree[attr_indx][value] = limit_val, majority
-            return tree
-
-        if len(counts) == 1:   # Checking purity of subset
-            myTree[attr_indx][value] = limit_val, clValue[0]
-            print("creating leaf")
-        else:
-            print("building tree")
-            #add coulumn names to subtable
-            zero_diagnosis = counts[int(clValue[0])]
-            other_diagnosis = counts[int(clValue[1])]
-            if (zero_diagnosis > other_diagnosis):
-                majority = clValue[0]
-            else:
-                majority = clValue[1]
-
-            myTree[attr_indx][value] = limit_val, majority, buildTree(subtable,  blacklist, depth-1)  # Calling the function recursively
+    # print("bla---------------------")
+    # for value in unique_attr_vals:
+    #
+    #    #root = DTNode(parent, p, n, 'testNode', attributeName=attribute, attributeIndex=attrIndex)
+    #
+    #     subtable = get_subtable(data, attr_indx, value)
+    #     clValue, counts = np.unique(subtable.transpose()[0][1:], return_counts=True)
+    #
+    #     majority = 0
+    #     # TODO check leaf creation
+    #     if( majority ):
+    #         zero_diagnosis = counts[int(clValue[0])]
+    #         other_diagnosis = counts[int(clValue[1])]
+    #         if (zero_diagnosis > other_diagnosis):
+    #             majority = clValue[0]
+    #             myTree[attr_indx][value] = limit_val, majority
+    #         else:
+    #             majority = clValue[1]
+    #             myTree[attr_indx][value] = limit_val, majority
+    #         return tree
+    #
+    #     if len(counts) == 1:   # Checking purity of subset
+    #         myTree[attr_indx][value] = limit_val, clValue[0]
+    #         print("creating leaf")
+    #     else:
+    #         print("building tree")
+    #         #add coulumn names to subtable
+    #         zero_diagnosis = counts[int(clValue[0])]
+    #         other_diagnosis = counts[int(clValue[1])]
+    #         if (zero_diagnosis > other_diagnosis):
+    #             majority = clValue[0]
+    #         else:
+    #             majority = clValue[1]
+    #
+    #         myTree[attr_indx][value] = limit_val, majority, buildTree(subtable,  blacklist, depth-1)  # Calling the function recursively
 
     return myTree
 
