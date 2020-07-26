@@ -1,7 +1,9 @@
 from math import log
 import numpy as np
 import pandas as pd
-import operator
+
+def find_entropy_of_attribute_with_threshold(data, column_idx, poss_limit):
+    return 1
 
 def find_entropy(data):
 
@@ -14,7 +16,46 @@ def find_entropy(data):
         entropy += -fraction * np.log2(fraction)
     return entropy
 
+def find_averages_for_attr(sort_arr):
+    poss_limit_values = []
+    for idx, val in enumerate(sort_arr):
+        if idx == len(sort_arr) - 1:
+            continue
+        poss_limit_values += [(val) + sort_arr[idx + 1] / 2]
+
+    return poss_limit_values
+
+
+def calc_IG_all_limit_vals_of_attr(poss_limit_values, data, column_idx):
+    ig_vec =[]
+
+    #for every possible threshold
+    for lim_idx, poss_limit in enumerate(poss_limit_values):
+        # calc IG = according to slide number 70(?)
+        all_ent = find_entropy(data)
+        other_ent = find_entropy_of_attribute_with_threshold(data, column_idx, poss_limit)
+        ig = all_ent - other_ent
+        ig_vec.append(ig)
+    return ig_vec
+
 def calc_all_IG(data):
+    transpose_data = data.transpose()
+    ig_vec= []
+
+    # for every column of data (for every attr)
+    # calc best threshold and IG for this threshold
+    for column_idx in range(1,len(transpose_data)):
+
+        sort_arr = sorted(transpose_data[column_idx][1:])
+
+        # find k-1 averages (limit values) for every i, i+1 values
+        poss_limit_values = find_averages_for_attr(sort_arr)
+        ig_vec = calc_IG_all_limit_vals_of_attr(poss_limit_values, transpose_data, column_idx)
+
+
+
+        print("here")
+        # sort the data by this attr
     return[(1,0.4)]
 
 #find the next attr to split the tree with
