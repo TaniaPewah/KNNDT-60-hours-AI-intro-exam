@@ -70,9 +70,9 @@ def calc_all_IG(data):
 
     # for every column of data (for every attr)
     # calc best threshold and IG for this threshold
-    for column_idx in range(1,len(transpose_data)):
+    for column_idx in range(1,len(transpose_data)-1):
 
-        sort_arr = sorted(transpose_data[column_idx][1:])
+        sort_arr = sorted(transpose_data[column_idx])
 
         # find k-1 averages (limit values) for every i, i+1 values
         poss_limit_values = find_averages_for_attr(sort_arr)
@@ -83,7 +83,6 @@ def calc_all_IG(data):
         chosen_limit_val = poss_limit_values[max_ig_indx]  # should insert the best limit val corresponding to the max ig
         final_attr_and_limit_vals += [(column_idx, chosen_limit_val, max_ig)]
 
-        print("here")
         # sort the data by this attr
     return final_attr_and_limit_vals
 
@@ -99,7 +98,6 @@ def find_winner(data):
     attr_idx_to_return = sorted_attr_IGs[-1][0]
     limit_val = sorted_attr_IGs[-1][1]
 
-    print(" winner is: ", attr_idx_to_return)
     return attr_idx_to_return, limit_val
 
 
@@ -137,9 +135,6 @@ def buildTree(data, tree=None):
     # Get attribute with maximum information gain
     attr_indx, limit_val = find_winner(data)
 
-    #TODO check if needed
-    attr_indx += 1
-
     lower, higher = classify_vals_transposed(data, attr_indx, limit_val)
 
     # feat_values = [example[attr_indx] for example in data]
@@ -158,12 +153,14 @@ def buildTree(data, tree=None):
     # there is no split make empty leaf
     if len(lower) == 0:
         myTree[attr_indx][0] = limit_val, None
+        print("lower: ", attr_indx, " empty leaf ")
     else:
         class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
 
         # if all lower are same class - its a leaf, save all lower examples in the leaf
         if len(class_vals_l) == 1:
             myTree[attr_indx][0] = limit_val, lower
+            print("lower: ", attr_indx, " ", len(lower))
 
         # keep building the tree
         else:
@@ -171,12 +168,14 @@ def buildTree(data, tree=None):
 
     if len(higher) == 0:
         myTree[attr_indx][1] = limit_val, None
+        print("higher: ", attr_indx, " empty leaf ")
     else:
         class_vals_h, counts_h = np.unique(higher[:, -1], return_counts=True)
 
         # if all higher are same class - its a leaf, save all higher examples in the leaf
         if len(class_vals_h) == 1:
             myTree[attr_indx][1] = limit_val, higher
+            print("higher: ", attr_indx, " ", len(higher))
 
         # keep building the tree
         else:
@@ -242,4 +241,5 @@ df_array = df.to_numpy()
 #entropy = find_entropy(df_array)
 tree = buildTree(df_array )
 
-print("hello")
+print(tree)
+print(tree)
