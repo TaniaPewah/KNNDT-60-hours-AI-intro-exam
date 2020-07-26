@@ -5,15 +5,16 @@ from math import sqrt
 eps = np.finfo(float).eps
 
 
+
 def calc_ent_ei(data, attribute_index, value_of_attr):
 
     temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, data.transpose())))
     return find_entropy(temp_data.transpose())
 
-def calc_mistake_ei(data, attribute_index, value_of_attr, K):
+def calc_mistake_ei(data, attribute_index, value_of_attr, K, cache):
     transposed = data.transpose()
     temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, transposed)))
-    return epsilon_range_mistake(temp_data, K)
+    return epsilon_range_mistake(temp_data, K, cache)
 
 def find_entropy_of_attribute_with_threshold(data, attribute_index, poss_limit):
     target_variables = np.unique(data[-1])  # This gives all 1 and 0
@@ -92,7 +93,7 @@ def calc_all_IG(data):
         # sort the data by this attr
     return final_attr_and_limit_vals
 
-def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, K):
+def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, K, cache):
     target_variables = np.unique(data[-1])  # This gives all 1 and 0
     # save attribute values for later
     prev_values = data[attribute_index].copy()
@@ -108,28 +109,29 @@ def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, 
     for idx, value_of_attr in enumerate(variables):
         denum = np.count_nonzero(data[attribute_index] == value_of_attr)
 
-        mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K)
-        sum_entr += (denum / len(data[0])) * mistake_Ei
+        #temp_data = np.array(list(filter(lambda row: row[attribute_index] < poss_limit, data.transpose())))
+        mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K, cache)
+        sum_entr += (denum / len(data[0])) * (1 - mistake_Ei)
 
     data[attribute_index] = prev_values
 
     return abs(sum_entr)
 
 
-def calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, data, column_idx, K):
+def calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, data, column_idx, K, cache):
     weighted_mistakes =[]
 
     #for every possible threshold
     for lim_idx, poss_limit in enumerate(poss_limit_values):
         # calc weighted mistakes
-        current_mistake = epsilon_range_mistake(data.transpose(), K)
+        # current_mistake = epsilon_range_mistake(data.transpose(), K)
         #print("calc_weigt_mistakes_for_all_thresholds_of_attr ", column_idx, " threshold: ", poss_limit)
-        children_mistake_sum = find_mistake_of_attribute_with_threshold(data, column_idx, poss_limit, K)
-        weighted_mistake = current_mistake - children_mistake_sum
+        children_mistake_sum = find_mistake_of_attribute_with_threshold(data, column_idx, poss_limit, K, cache)
+        weighted_mistake = children_mistake_sum
         weighted_mistakes.append(weighted_mistake)
     return weighted_mistakes
 
-def calc_weigh_mistakes(data, K):
+def calc_weigh_mistakes(data, K, cache):
     transpose_data = data.transpose()
     final_attr_thresholds_mistakes = []
 
@@ -139,9 +141,9 @@ def calc_weigh_mistakes(data, K):
         #print("checking for attr: ", column_idx)
         sort_arr = sorted(transpose_data[column_idx])
 
-        # find k-1 averages (limit values) for every i, i+1 values
-        poss_limit_values = np.percentile(sort_arr,[25,50,75])
-        res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K)
+        #poss_limit_values = np.percentile(sort_arr,[12.5, 25, 37.5, 50, 62.5, 75, 87.5])
+        poss_limit_values = np.percentile(sort_arr, [25,  50, 75])
+        res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K, cache)
 
         # chose max IG and the limit val according to max
         max_ig_indx, max_ig = res_vec.index(max(res_vec)), max(res_vec)  # get also index
@@ -153,10 +155,10 @@ def calc_weigh_mistakes(data, K):
 
 
 #find the next attr to split the tree with
-def find_winner(data, K):
+def find_winner(data, K, cache):
 
     #attr_IGs = calc_all_IG(data)
-    attr_weighted_mistakes = calc_weigh_mistakes(data, K)
+    attr_weighted_mistakes = calc_weigh_mistakes(data, K, cache)
     sorted_attr_weighted_mistakes = sorted(attr_weighted_mistakes, key=lambda item: item[-1])  # decreasing IG values
 
     if len(sorted_attr_weighted_mistakes) == 1:
@@ -184,7 +186,7 @@ def check_class(neighbors):
     prediction = max(set(output_values), key=output_values.count)
     return prediction
 
-def epsilon_range_mistake( branch_data, K ):
+def epsilon_range_mistake( branch_data, K, cache):
 
     # no mistake if only one example in the group
     if len(branch_data) == 1:
@@ -192,7 +194,7 @@ def epsilon_range_mistake( branch_data, K ):
 
     wrong_classes = 0
     for row in branch_data:
-        neighbors = get_neighbors(branch_data, row, K)
+        neighbors = get_neighbors(branch_data, row, K, cache)
         class_by_knn = check_class(neighbors)
         wrong_classes += 0 if class_by_knn == row[-1] else 1
 
@@ -230,35 +232,44 @@ def normalize_row(row, minmax):
         norm_row[i] = (row[i] - low) / (high - low)
     return norm_row
 
-def get_neighbors(data, test_row, num_neighbors):
-    distances = list()
+def get_neighbors(data, test_row, num_neighbors, cache):
+    dists = list()
 
     for train_row in data:
-        dist = euclidean_distance(test_row, train_row)
-        distances.append((train_row, dist))
+        dist = euclidean_distance(test_row, train_row, cache)
+        dists.append((train_row, dist))
 
-    distances.sort(key=lambda tup: tup[1])
+    dists.sort(key=lambda tup: tup[1])
     neighbors = list()
 
     num_neighbors = data.shape[0] - 1 if num_neighbors >= data.shape[0] else num_neighbors
-    distances = distances[1:]
+    dists = dists[1:]
     # closest is myself then start from 1
     for i in range(0, num_neighbors):
-        neighbors.append(distances[i][0])
+        neighbors.append(dists[i][0])
 
     return np.array(neighbors)
 
+
+
 # calculate the Euclidean distance between two vectors
-def euclidean_distance(row1, row2):
+def euclidean_distance(row1, row2, distances):
     distance = 0.0
-  #  if get_cache_dist(row1[0]][row2[0]) is not None:
-   #     return get_cache_dist(row1[0]][row2[0])
+    key = str(int(row1[0])) + " " + str(int(row2[0]))
+
+    if key in distances.keys():
+        return distances[key]
     for i in range(1, len(row1)-1):
         distance += (float(row1[i]) - float(row2[i]))**2
+
+    distance = sqrt(distance)
+
+    key2 = str(int(row2[0])) + " " + str(int(row1[0]))
+    distances[key] = distance
+    distances[key2] = distance
     return sqrt(distance)
 
-
-def buildTree(data, K, M, epsilon):
+def buildTree(data, K, M, epsilon, cache):
 
     #TODO check its NP
     #Create a list of results for the training data example classes
@@ -268,7 +279,7 @@ def buildTree(data, K, M, epsilon):
     if classList.count(classList[0]) == len(classList):   return classList[0]
 
     # Get attribute with maximum information gain
-    attr_indx, limit_val = find_winner(data, K)
+    attr_indx, limit_val = find_winner(data, K, cache)
     print("winner is: ", attr_indx)
 
     lower, higher = classify_vals_transposed(data, attr_indx, limit_val)
@@ -284,7 +295,7 @@ def buildTree(data, K, M, epsilon):
 
         class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
 
-        mistake = epsilon_range_mistake(lower, K)
+        mistake = epsilon_range_mistake(lower, K, cache)
         # if all lower are same class - its a leaf, save all lower examples in the leaf
         if len(class_vals_l) == 1 or mistake <= epsilon or len(lower) <= M*K:
             myTree[attr_indx][0] = limit_val, lower
@@ -292,7 +303,7 @@ def buildTree(data, K, M, epsilon):
 
         # keep building the tree
         else:
-            myTree[attr_indx][0] = limit_val, buildTree(lower, K, M, epsilon)
+            myTree[attr_indx][0] = limit_val, buildTree(lower, K, M, epsilon, cache)
 
     if len(higher) == 0:
         myTree[attr_indx][1] = limit_val, None
@@ -301,25 +312,24 @@ def buildTree(data, K, M, epsilon):
         class_vals_h, counts_h = np.unique(higher[:, -1], return_counts=True)
 
         # if all higher are same class - its a leaf, save all higher examples in the leaf
-        mistake = epsilon_range_mistake(higher, K)
+        mistake = epsilon_range_mistake(higher, K, cache)
         if len(class_vals_h) == 1 or mistake <= epsilon or len(higher) <= M * K:
             myTree[attr_indx][1] = limit_val, higher
             print("higher: ", attr_indx, " ", len(higher), "threshold: ", limit_val, "mistake: ", mistake)
 
         # keep building the tree
         else:
-            myTree[attr_indx][1] = limit_val, buildTree(higher, K, M, epsilon)
+            myTree[attr_indx][1] = limit_val, buildTree(higher, K, M, epsilon, cache)
 
     return myTree
 
 
 df = pd.read_csv('train_9.csv')
 df_array = df.to_numpy()
+#distances = np.empty((df_array.shape[0], df_array.shape[0]))
+
 
 #entropy = find_entropy(df_array)
 minmax_list = dataset_minmax(df_array)
 normalized = normalize_dataset(df_array, minmax_list)
-tree = buildTree( normalized, 3, 2, 0.02 )
-
-print(tree)
-print(tree)
+tree = buildTree( normalized, 4, 2, 0.01, {} )
