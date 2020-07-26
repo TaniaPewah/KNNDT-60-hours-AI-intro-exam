@@ -141,31 +141,40 @@ def dataset_minmax(dataset):
 
 # Rescale dataset columns to the range 0-1
 def normalize_dataset(dataset, minmax):
-    norm_data =[]
-    for row in dataset:
+    norm_data = np.zeros(shape=dataset.shape)
+    for idx, row in enumerate(dataset):
         for i in range(len(row)):
             high = minmax[i][1]
             low = minmax[i][0]
-            norm_data[row][i] = (row[i] - low) / (high - low)
+            norm_data[idx][i] = (row[i] - low) / (high - low)
     return norm_data
 
+# Rescale row to the range 0-1
+def normalize_row(row, minmax):
+    norm_row = np.zeros(len(row))
+    for i in range(len(row)):
+        high = minmax[i][1]
+        low = minmax[i][0]
+        norm_row[i] = (row[i] - low) / (high - low)
+    return norm_row
 
 def get_neighbors(data, test_row, num_neighbors):
     distances = list()
     minmax_list = dataset_minmax(data)
+    norm_row = normalize_row(test_row, minmax_list)
     normalized = normalize_dataset(data, minmax_list)
 
-    for train_row in data:
-        dist = euclidean_distance(test_row, train_row)
+    for train_row in normalized:
+        dist = euclidean_distance(norm_row, train_row)
         distances.append((train_row, dist))
 
     distances.sort(key=lambda tup: tup[1])
     neighbors = list()
 
-    for i in range(num_neighbors):
+    for i in range(1, num_neighbors+1):
         neighbors.append(distances[i][0])
 
-    return neighbors
+    return np.array(neighbors)
 
 # calculate the Euclidean distance between two vectors
 def euclidean_distance(row1, row2):
@@ -231,7 +240,7 @@ df = pd.read_csv('train_9.csv')
 df_array = df.to_numpy()
 
 #entropy = find_entropy(df_array)
-tree = buildTree(df_array, K, M, epsilon )
+tree = buildTree(df_array, 1, 1, 0 )
 
 print(tree)
 print(tree)
