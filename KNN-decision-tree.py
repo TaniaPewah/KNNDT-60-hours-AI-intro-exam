@@ -1,18 +1,44 @@
 from math import log
 import numpy as np
 import pandas as pd
+eps = np.finfo(float).eps
 
-def find_entropy_of_attribute_with_threshold(data, column_idx, poss_limit):
-    return 1
+
+def calc_ent_ei(data, attribute_index, value_of_attr):
+
+    temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, data.transpose())))
+    return find_entropy(temp_data.transpose())
+
+def find_entropy_of_attribute_with_threshold(data, attribute_index, poss_limit):
+    target_variables = np.unique(data[-1])  # This gives all 1 and 0
+    # save attribute values for later
+    prev_values = data[attribute_index].copy()
+
+    for sample_index in range(0, len(data[attribute_index])):
+        data[attribute_index][sample_index] = 0 if poss_limit > data[attribute_index][sample_index] else 1
+    # This gives different binary values of chosen attribute after classification
+    variables = np.unique(data[attribute_index][1:])
+
+    sum_entr = 0
+
+    # foe every possible value of this attr, calc its entropy Ei and put in entropies_of_sons
+    for idx, value_of_attr in enumerate(variables):
+        denum = np.count_nonzero(data[attribute_index] == value_of_attr)
+
+        ent_Ei = calc_ent_ei(data, attribute_index, value_of_attr)
+        sum_entr += (denum / len(data[0])) * ent_Ei
+
+    data[attribute_index] = prev_values
+
+    return abs(sum_entr)
 
 def find_entropy(data):
 
     entropy = 0
-    transposed = data.transpose()
-    values = np.unique(transposed[-1])
+    values = np.unique(data[-1])
 
     for value in values:
-        fraction = np.count_nonzero(transposed[-1] == value) / len(transposed[-1])
+        fraction = np.count_nonzero(data[-1] == value) / len(data[-1])
         entropy += -fraction * np.log2(fraction)
     return entropy
 
@@ -21,7 +47,7 @@ def find_averages_for_attr(sort_arr):
     for idx, val in enumerate(sort_arr):
         if idx == len(sort_arr) - 1:
             continue
-        poss_limit_values += [(val) + sort_arr[idx + 1] / 2]
+        poss_limit_values += [(val + sort_arr[idx + 1]) / 2]
 
     return poss_limit_values
 
@@ -40,7 +66,7 @@ def calc_IG_all_limit_vals_of_attr(poss_limit_values, data, column_idx):
 
 def calc_all_IG(data):
     transpose_data = data.transpose()
-    ig_vec= []
+    final_attr_and_limit_vals = []
 
     # for every column of data (for every attr)
     # calc best threshold and IG for this threshold
@@ -52,17 +78,20 @@ def calc_all_IG(data):
         poss_limit_values = find_averages_for_attr(sort_arr)
         ig_vec = calc_IG_all_limit_vals_of_attr(poss_limit_values, transpose_data, column_idx)
 
-
+        # chose max IG and the limit val according to max
+        max_ig_indx, max_ig = ig_vec.index(max(ig_vec)), max(ig_vec)  # get also index
+        chosen_limit_val = poss_limit_values[max_ig_indx]  # should insert the best limit val corresponding to the max ig
+        final_attr_and_limit_vals += [(column_idx, chosen_limit_val, max_ig)]
 
         print("here")
         # sort the data by this attr
-    return[(1,0.4)]
+    return final_attr_and_limit_vals
 
 #find the next attr to split the tree with
 def find_winner(data):
 
     attr_IGs = calc_all_IG(data)
-    sorted_attr_IGs = sorted(attr_IGs, key=lambda item: item[1])  # decreasing IG values
+    sorted_attr_IGs = sorted(attr_IGs, key=lambda item: item[-1])  # decreasing IG values
 
     if len(sorted_attr_IGs) == 1:
         return sorted_attr_IGs[0][0], sorted_attr_IGs[0][1]
