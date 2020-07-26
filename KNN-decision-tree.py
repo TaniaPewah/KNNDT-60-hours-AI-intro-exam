@@ -54,7 +54,7 @@ def get_subtable(data, attr_index, value):
     returned = np.vstack((col_names, returned))
     return returned
 
-def buildTree(data , depth, tree=None):
+def buildTree(data, tree=None):
 
     #TODO check its NP
     #Create a list of results for the training data example classes
@@ -78,11 +78,24 @@ def buildTree(data , depth, tree=None):
     #attValues = np.unique(transposed[attr_indx])
 
     # Create an empty dictionary to create tree
-    if tree is None:
-        tree = {}
-        tree[attr_indx] = {}
+    # if tree is None:
+    #     tree = {}
+    #     tree[attr_indx] = {}
 
     myTree = {attr_indx: {}}
+
+    # if len lower or len higher == 0
+    # there is no split make empty leaf
+
+    class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
+    class_vals_h, counts_h = np.unique(higher[:,-1], return_counts=True)
+
+    # if all lower are same class - its a leaf, save all lower examples in the leaf
+    # if all higher are same class - its a leaf, save all higher examples in the leaf
+
+    myTree[attr_indx][0] = limit_val, buildTree(lower)
+    myTree[attr_indx][1] = limit_val, buildTree(higher)
+
 
 
     # We make loop to construct a tree by calling this function recursively.
@@ -121,7 +134,7 @@ def buildTree(data , depth, tree=None):
     #         else:
     #             majority = clValue[1]
     #
-    #         myTree[attr_indx][value] = limit_val, majority, buildTree(subtable,  blacklist, depth-1)  # Calling the function recursively
+    #         myTree[attr_indx][value] = limit_val, majority, buildTree(subtable)  # Calling the function recursively
 
     return myTree
 
@@ -131,6 +144,6 @@ df = pd.read_csv('train_9.csv')
 df_array = df.to_numpy()
 
 #entropy = find_entropy(df_array)
-tree = buildTree(df_array, float('inf'))
+tree = buildTree(df_array )
 
 print("hello")
