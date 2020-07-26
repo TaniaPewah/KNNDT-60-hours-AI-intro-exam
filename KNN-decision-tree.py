@@ -2,6 +2,7 @@ from math import log
 import numpy as np
 import pandas as pd
 from math import sqrt
+import copy
 eps = np.finfo(float).eps
 
 
@@ -11,9 +12,17 @@ def calc_ent_ei(data, attribute_index, value_of_attr):
     temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, data.transpose())))
     return find_entropy(temp_data.transpose())
 
-def calc_mistake_ei(data, attribute_index, value_of_attr, K, cache):
-    transposed = data.transpose()
+def calc_mistake_ei(data, attribute_index, value_of_attr, K, cache, prev_values):
+
+    transposed = copy.deepcopy(data.transpose())
+    copy_data = copy.deepcopy(data)
     temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, transposed)))
+    copy_data[attribute_index] = prev_values
+
+    for temp_row in temp_data:
+        prev_val = np.array(list(filter(lambda row: row[0] == temp_row[0], copy_data.transpose())))[0][attribute_index]
+        temp_row[attribute_index] = prev_val
+
     return epsilon_range_mistake(temp_data, K, cache)
 
 def find_entropy_of_attribute_with_threshold(data, attribute_index, poss_limit):
@@ -110,7 +119,7 @@ def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, 
         denum = np.count_nonzero(data[attribute_index] == value_of_attr)
 
         #temp_data = np.array(list(filter(lambda row: row[attribute_index] < poss_limit, data.transpose())))
-        mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K, cache)
+        mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K, cache,  prev_values)
         sum_entr += (denum / len(data[0])) * (1 - mistake_Ei)
 
     data[attribute_index] = prev_values
@@ -139,10 +148,9 @@ def calc_weigh_mistakes(data, K, cache):
     # calc best threshold and IG for this threshold
     for column_idx in range(1, len(transpose_data) - 1):
         #print("checking for attr: ", column_idx)
-        sort_arr = sorted(transpose_data[column_idx])
 
-        #poss_limit_values = np.percentile(sort_arr,[12.5, 25, 37.5, 50, 62.5, 75, 87.5])
-        poss_limit_values = np.percentile(sort_arr, [25,  50, 75])
+        poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
+        #poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
         res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K, cache)
 
         # chose max IG and the limit val according to max
@@ -332,4 +340,4 @@ df_array = df.to_numpy()
 #entropy = find_entropy(df_array)
 minmax_list = dataset_minmax(df_array)
 normalized = normalize_dataset(df_array, minmax_list)
-tree = buildTree( normalized, 4, 2, 0.01, {} )
+tree = buildTree( normalized, 4, 3, 0.01, {} )
