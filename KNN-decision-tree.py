@@ -1,6 +1,7 @@
 from math import log
 import numpy as np
 import pandas as pd
+from math import sqrt
 eps = np.finfo(float).eps
 
 
@@ -102,30 +103,76 @@ def find_winner(data):
 
 
 def classify_vals_transposed(data, attr_index, limit_val):
-
     lower = []
     higher = []
-
     # for every row
     for index, row in enumerate(data):
-
         if row[attr_index] < limit_val:
             lower.append(row)
-        else :
+        else:
             higher.append(row)
     return np.array(lower), np.array(higher)
 
-
-def get_subtable(data, attr_index, value):
-    col_names = data[0]
-    returned = data[data[:,attr_index] == value]
-    returned = np.vstack((col_names, returned))
-    return returned
+def check_class(neighbors):
+    output_values = [neighbor[-1] for neighbor in neighbors]
+    prediction = max(set(output_values), key=output_values.count)
+    return prediction
 
 def epsilon_range_mistake( branch_data, epsilon, K ):
+    wrong_classes = 0
     for row in branch_data:
-        print("here")
-    return True
+        neighbors = get_neighbors(branch_data, row, K)
+        class_by_knn = check_class(neighbors)
+        wrong_classes += 0 if class_by_knn == row[-1] else 1
+
+    return (wrong_classes / len(branch_data)) < epsilon
+
+
+# Find the min and max values for each column
+def dataset_minmax(dataset):
+    minmax = list()
+    for i in range(len(dataset[0])):
+        col_values = [row[i] for row in dataset]
+        value_min = min(col_values)
+        value_max = max(col_values)
+        minmax.append([value_min, value_max])
+    # returns a list of min and max vals for each attr
+    return minmax
+
+# Rescale dataset columns to the range 0-1
+def normalize_dataset(dataset, minmax):
+    norm_data =[]
+    for row in dataset:
+        for i in range(len(row)):
+            high = minmax[i][1]
+            low = minmax[i][0]
+            norm_data[row][i] = (row[i] - low) / (high - low)
+    return norm_data
+
+
+def get_neighbors(data, test_row, num_neighbors):
+    distances = list()
+    minmax_list = dataset_minmax(data)
+    normalized = normalize_dataset(data, minmax_list)
+
+    for train_row in data:
+        dist = euclidean_distance(test_row, train_row)
+        distances.append((train_row, dist))
+
+    distances.sort(key=lambda tup: tup[1])
+    neighbors = list()
+
+    for i in range(num_neighbors):
+        neighbors.append(distances[i][0])
+
+    return neighbors
+
+# calculate the Euclidean distance between two vectors
+def euclidean_distance(row1, row2):
+    distance = 0.0
+    for i in range(1, len(row1)-1):
+        distance += (float(row1[i]) - float(row2[i]))**2
+    return sqrt(distance)
 
 
 def buildTree(data, K, M, epsilon):
