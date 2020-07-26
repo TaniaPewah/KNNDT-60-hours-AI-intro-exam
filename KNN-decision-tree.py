@@ -123,6 +123,7 @@ def calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, data, colu
     for lim_idx, poss_limit in enumerate(poss_limit_values):
         # TODO calc weighted mistakes
         current_mistake = epsilon_range_mistake(data.transpose(), K)
+        print("calc_weigt_mistakes_for_all_thresholds_of_attr ", column_idx, " threshold: ", poss_limit)
         children_mistake_sum = find_mistake_of_attribute_with_threshold(data, column_idx, poss_limit, K)
         weighted_mistake = current_mistake - children_mistake_sum
         weighted_mistakes.append(weighted_mistake)
@@ -135,6 +136,7 @@ def calc_weigh_mistakes(data, K):
     # for every column of data (for every attr)
     # calc best threshold and IG for this threshold
     for column_idx in range(1, len(transpose_data) - 1):
+        print("checking for attr: ", column_idx)
         sort_arr = sorted(transpose_data[column_idx])
 
         # find k-1 averages (limit values) for every i, i+1 values
@@ -313,7 +315,7 @@ df_array = df.to_numpy()
 #entropy = find_entropy(df_array)
 minmax_list = dataset_minmax(df_array)
 normalized = normalize_dataset(df_array, minmax_list)
-tree = buildTree(normalized, 5, 1, 0 )
+tree = buildTree(normalized, 2, 1, 0 )
 
 print(tree)
 print(tree)
