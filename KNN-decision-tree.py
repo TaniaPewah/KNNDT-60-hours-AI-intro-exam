@@ -86,15 +86,41 @@ def buildTree(data, tree=None):
 
     # if len lower or len higher == 0
     # there is no split make empty leaf
+    if len(lower) == 0:
+        myTree[attr_indx][0] = limit_val, None
+    else:
+        class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
 
-    class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
-    class_vals_h, counts_h = np.unique(higher[:,-1], return_counts=True)
+        # if all lower are same class - its a leaf, save all lower examples in the leaf
+        if len(class_vals_l) == 1:
+            myTree[attr_indx][0] = limit_val, lower
 
-    # if all lower are same class - its a leaf, save all lower examples in the leaf
-    # if all higher are same class - its a leaf, save all higher examples in the leaf
+        # keep building the tree
+        else:
+            myTree[attr_indx][0] = limit_val, buildTree(lower)
 
-    myTree[attr_indx][0] = limit_val, buildTree(lower)
-    myTree[attr_indx][1] = limit_val, buildTree(higher)
+    if len(higher) == 0:
+        myTree[attr_indx][1] = limit_val, None
+    else:
+        class_vals_h, counts_h = np.unique(higher[:, -1], return_counts=True)
+
+        # if all higher are same class - its a leaf, save all higher examples in the leaf
+        if len(class_vals_h) == 1:
+            myTree[attr_indx][1] = limit_val, higher
+
+        # keep building the tree
+        else:
+            myTree[attr_indx][1] = limit_val, buildTree(higher)
+
+    return myTree
+
+
+
+
+
+
+
+
 
 
 
@@ -136,7 +162,7 @@ def buildTree(data, tree=None):
     #
     #         myTree[attr_indx][value] = limit_val, majority, buildTree(subtable)  # Calling the function recursively
 
-    return myTree
+
 
 
 
