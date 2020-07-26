@@ -10,6 +10,11 @@ def calc_ent_ei(data, attribute_index, value_of_attr):
     temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, data.transpose())))
     return find_entropy(temp_data.transpose())
 
+def calc_mistake_ei(data, attribute_index, value_of_attr, K):
+    transposed = data.transpose()
+    temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, transposed)))
+    return epsilon_range_mistake(temp_data, K)
+
 def find_entropy_of_attribute_with_threshold(data, attribute_index, poss_limit):
     target_variables = np.unique(data[-1])  # This gives all 1 and 0
     # save attribute values for later
@@ -87,17 +92,76 @@ def calc_all_IG(data):
         # sort the data by this attr
     return final_attr_and_limit_vals
 
+def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, K):
+    target_variables = np.unique(data[-1])  # This gives all 1 and 0
+    # save attribute values for later
+    prev_values = data[attribute_index].copy()
+
+    for sample_index in range(0, len(data[attribute_index])):
+        data[attribute_index][sample_index] = 0 if poss_limit > data[attribute_index][sample_index] else 1
+    # This gives different binary values of chosen attribute after classification
+    variables = np.unique(data[attribute_index][1:])
+
+    sum_entr = 0
+
+    # for every possible value of this attr,
+    for idx, value_of_attr in enumerate(variables):
+        denum = np.count_nonzero(data[attribute_index] == value_of_attr)
+
+        mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K)
+        sum_entr += (denum / len(data[0])) * mistake_Ei
+
+    data[attribute_index] = prev_values
+
+    return abs(sum_entr)
+
+
+def calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, data, column_idx, K):
+    weighted_mistakes =[]
+
+    #for every possible threshold
+    for lim_idx, poss_limit in enumerate(poss_limit_values):
+        # TODO calc weighted mistakes
+        current_mistake = epsilon_range_mistake(data.transpose(), K)
+        children_mistake_sum = find_mistake_of_attribute_with_threshold(data, column_idx, poss_limit, K)
+        weighted_mistake = current_mistake - children_mistake_sum
+        weighted_mistakes.append(weighted_mistake)
+    return weighted_mistakes
+
+def calc_weigh_mistakes(data, K):
+    transpose_data = data.transpose()
+    final_attr_thresholds_mistakes = []
+
+    # for every column of data (for every attr)
+    # calc best threshold and IG for this threshold
+    for column_idx in range(1, len(transpose_data) - 1):
+        sort_arr = sorted(transpose_data[column_idx])
+
+        # find k-1 averages (limit values) for every i, i+1 values
+        poss_limit_values = find_averages_for_attr(sort_arr)
+        res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K)
+
+        # chose max IG and the limit val according to max
+        max_ig_indx, max_ig = res_vec.index(max(res_vec)), max(res_vec)  # get also index
+        chosen_limit_val = poss_limit_values[ max_ig_indx]  # should insert the best limit val corresponding to the max ig
+        final_attr_thresholds_mistakes += [(column_idx, chosen_limit_val, max_ig)]
+
+        # sort the data by this attr
+    return final_attr_thresholds_mistakes
+
+
 #find the next attr to split the tree with
-def find_winner(data):
+def find_winner(data, K):
 
-    attr_IGs = calc_all_IG(data)
-    sorted_attr_IGs = sorted(attr_IGs, key=lambda item: item[-1])  # decreasing IG values
+    #attr_IGs = calc_all_IG(data)
+    attr_weighted_mistakes = calc_weigh_mistakes(data, K)
+    sorted_attr_weighted_mistakes = sorted(attr_weighted_mistakes, key=lambda item: item[-1])  # decreasing IG values
 
-    if len(sorted_attr_IGs) == 1:
-        return sorted_attr_IGs[0][0], sorted_attr_IGs[0][1]
+    if len(sorted_attr_weighted_mistakes) == 1:
+        return sorted_attr_weighted_mistakes[0][0], sorted_attr_weighted_mistakes[0][1]
 
-    attr_idx_to_return = sorted_attr_IGs[-1][0]
-    limit_val = sorted_attr_IGs[-1][1]
+    attr_idx_to_return = sorted_attr_weighted_mistakes[-1][0]
+    limit_val = sorted_attr_weighted_mistakes[-1][1]
 
     return attr_idx_to_return, limit_val
 
@@ -118,14 +182,19 @@ def check_class(neighbors):
     prediction = max(set(output_values), key=output_values.count)
     return prediction
 
-def epsilon_range_mistake( branch_data, epsilon, K ):
+def epsilon_range_mistake( branch_data, K ):
+
+    # no mistake if only one example in the group
+    if len(branch_data) == 1:
+        return 0
+
     wrong_classes = 0
     for row in branch_data:
         neighbors = get_neighbors(branch_data, row, K)
         class_by_knn = check_class(neighbors)
         wrong_classes += 0 if class_by_knn == row[-1] else 1
 
-    return (wrong_classes / len(branch_data)) < epsilon
+    return wrong_classes / len(branch_data)
 
 
 # Find the min and max values for each column
@@ -142,8 +211,9 @@ def dataset_minmax(dataset):
 # Rescale dataset columns to the range 0-1
 def normalize_dataset(dataset, minmax):
     norm_data = np.zeros(shape=dataset.shape)
+    norm_data[:,0] = dataset[:,0]
     for idx, row in enumerate(dataset):
-        for i in range(len(row)):
+        for i in range(1,len(row)):
             high = minmax[i][1]
             low = minmax[i][0]
             norm_data[idx][i] = (row[i] - low) / (high - low)
@@ -160,18 +230,18 @@ def normalize_row(row, minmax):
 
 def get_neighbors(data, test_row, num_neighbors):
     distances = list()
-    minmax_list = dataset_minmax(data)
-    norm_row = normalize_row(test_row, minmax_list)
-    normalized = normalize_dataset(data, minmax_list)
 
-    for train_row in normalized:
-        dist = euclidean_distance(norm_row, train_row)
+    for train_row in data:
+        dist = euclidean_distance(test_row, train_row)
         distances.append((train_row, dist))
 
     distances.sort(key=lambda tup: tup[1])
     neighbors = list()
 
-    for i in range(1, num_neighbors+1):
+    num_neighbors = data.shape[0] - 1 if num_neighbors >= data.shape[0] else num_neighbors
+    distances = distances[1:]
+    # closest is myself then start from 1
+    for i in range(0, num_neighbors):
         neighbors.append(distances[i][0])
 
     return np.array(neighbors)
@@ -194,7 +264,8 @@ def buildTree(data, K, M, epsilon):
     if classList.count(classList[0]) == len(classList):   return classList[0]
 
     # Get attribute with maximum information gain
-    attr_indx, limit_val = find_winner(data)
+    attr_indx, limit_val = find_winner(data, K)
+    print("winner is: ", attr_indx)
 
     lower, higher = classify_vals_transposed(data, attr_indx, limit_val)
 
@@ -210,7 +281,7 @@ def buildTree(data, K, M, epsilon):
         class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
 
         # if all lower are same class - its a leaf, save all lower examples in the leaf
-        if len(class_vals_l) == 1 or epsilon_range_mistake(lower, epsilon, K) or len(lower) <= M*K:
+        if len(class_vals_l) == 1 or epsilon_range_mistake(lower, K) <= epsilon or len(lower) <= M*K:
             myTree[attr_indx][0] = limit_val, lower
             print("lower: ", attr_indx, " ", len(lower))
 
@@ -240,7 +311,9 @@ df = pd.read_csv('train_9.csv')
 df_array = df.to_numpy()
 
 #entropy = find_entropy(df_array)
-tree = buildTree(df_array, 1, 1, 0 )
+minmax_list = dataset_minmax(df_array)
+normalized = normalize_dataset(df_array, minmax_list)
+tree = buildTree(normalized, 5, 1, 0 )
 
 print(tree)
 print(tree)
