@@ -1,7 +1,7 @@
-from math import log
 import numpy as np
 import pandas as pd
 from math import sqrt
+from matplotlib import pyplot as plt
 import random
 import copy
 eps = np.finfo(float).eps
@@ -157,9 +157,10 @@ def calc_weigh_mistakes(data, K, cache):
 
         # chose max IG and the limit val according to max
         max_ig_indx, max_ig = res_vec.index(max(res_vec)), max(res_vec)  # get also index
-        chosen_limit_val = poss_limit_values[ max_ig_indx]  # should insert the best limit val corresponding to the max ig
+        chosen_limit_val = poss_limit_values[ max_ig_indx]
         final_attr_thresholds_mistakes += [(column_idx, chosen_limit_val, max_ig)]
 
+        a = sorted(final_attr_thresholds_mistakes, key=lambda item: item[-1])
         # sort the data by this attr
     return final_attr_thresholds_mistakes
 
@@ -195,6 +196,9 @@ def classify_vals_transposed(data, attr_index, limit_val):
     return np.array(lower), np.array(higher)
 
 def check_class(neighbors):
+    if len(neighbors) == 0:
+        print("WHY AM I HERE")
+        return 0
     output_values = [neighbor[-1] for neighbor in neighbors]
     prediction = max(set(output_values), key=output_values.count)
     return prediction
@@ -203,6 +207,7 @@ def get_eval_mistake(branch_data, K, cache):
 
     # no mistake if only one example in the group
     if len(branch_data) == 1:
+        #print("only 1 exmpl here")
         return 0
 
     wrong_classes = 0
@@ -256,8 +261,10 @@ def get_neighbors(data, test_row, num_neighbors, cache):
     neighbors = list()
 
     num_neighbors = data.shape[0] - 1 if num_neighbors >= data.shape[0] else num_neighbors
+
+    #cut myself off
     dists = dists[1:]
-    # closest is myself then start from 1
+
     for i in range(0, num_neighbors):
         neighbors.append(dists[i][0])
 
@@ -303,7 +310,7 @@ def buildTree(data, K, M, epsilon, cache):
     # there is no split make empty leaf
     if len(lower) == 0:
         myTree[attr_indx][0] = limit_val, None
-        print("lower: ", attr_indx, " empty leaf ")
+        #print("lower: ", attr_indx, " empty leaf ")
     else:
 
         class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
@@ -320,7 +327,7 @@ def buildTree(data, K, M, epsilon, cache):
 
     if len(higher) == 0:
         myTree[attr_indx][1] = limit_val, None
-        print("higher: ", attr_indx, " empty leaf ")
+        #print("higher: ", attr_indx, " empty leaf ")
     else:
         class_vals_h, counts_h = np.unique(higher[:, -1], return_counts=True)
 
@@ -374,29 +381,88 @@ def predict(query, tree, K, new_cache):
     return find_leaf(tree, list(tree.keys())[0], query, K, new_cache)
 
 
-def calc_accuracy( tree, test_data, K ):
-    test_array = test_data.to_numpy()
-    correct_pred_sum = 0
+def get_prediction( tree, test_data, K ):
+
     new_cache = {}
+    prediction = []
 
-    for idx, row in enumerate(test_array):
-
+    for idx, row in enumerate(test_data):
         predicted = predict(row, tree, K, new_cache)
-        correct_pred_sum += 1 if row[47] == predicted else 0
+        prediction += [predicted]
 
-    accuracy = correct_pred_sum / len(test_array)
-    print(accuracy)
-
-df = pd.read_csv('train_9.csv')
-df_array = df.to_numpy()
-#distances = np.empty((df_array.shape[0], df_array.shape[0]))
+    return prediction
 
 
-#entropy = find_entropy(df_array)
-#minmax_list = dataset_minmax(df_array)
-#normalized = normalize_dataset(df_array, minmax_list)
-tree = buildTree( df_array, 4, 3, 0.05, {} )
+def calc_accuracy( tree, test_data, K):
+    correct_pred_sum = 0
 
-test_df = pd.read_csv('test_9.csv')
-calc_accuracy(tree, test_df, 4)
+    predictions = get_prediction( tree, test_data, K )
+    # TODO check if predictions and test data are of the same size
 
+    for idx, row in enumerate(test_data):
+        correct_pred_sum += 1 if row[-1] == predictions[idx] else 0
+
+    accuracy = correct_pred_sum / len(test_data)
+    return accuracy
+
+
+def KNN_build_and_test( train, test, K, M, epsilon):
+    train = train.to_numpy()
+    test = test.to_numpy()
+    tree = buildTree(train, K, M, epsilon, {})
+    return calc_accuracy(tree, test, K)
+
+def experiments():
+    Ms = [1, 2, 3, 4, 5]
+    default_K = 4
+    default_M = 2
+    default_eps = 0.01
+    accuracies = []
+    sizes = [1, 3, 9, 27]
+
+    train = pd.read_csv('train_9.csv')
+    test_df = pd.read_csv('test_9.csv')
+
+    for m in Ms:
+
+        accuracy = KNN_build_and_test(train, test_df, default_K, m, default_eps)
+        accuracies.append(accuracy)
+        print(m, ' M accuracy:', accuracy)
+
+    # Plot results:
+    plt.plot(Ms, accuracies)
+    plt.title('M Accuracies')
+    plt.xlabel('M')
+    plt.ylabel('Accuracies(%)')
+    plt.show()
+
+
+
+
+def calc_accuracy_of_forest( results, test_data ):
+
+    return 1
+
+def forest_comitee(train, test):
+
+    train = train.to_numpy()
+    test = test.to_numpy()
+    params = [(), (), ()]
+    results = []
+    for param_set in params:
+        K = param_set[0]
+        M = param_set[1]
+        epsilon = param_set[2]
+        tree = buildTree(train, K, M, epsilon, {})
+        results += get_prediction(tree, test, K)
+
+    #TODO check results are as expected
+    accuracy = calc_accuracy_of_forest(results)
+    # calc majority of votes fore every test item,
+    # calc accuracy
+
+    # TODO detach prediction result of test and return it here
+    return
+
+
+experiments()
