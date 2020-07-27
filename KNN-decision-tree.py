@@ -151,8 +151,8 @@ def calc_weigh_mistakes(data, K, cache):
     for column_idx in range(1, len(transpose_data) - 1):
         #print("checking for attr: ", column_idx)
 
-        poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
-        #poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
+        #poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
+        poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
         res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K, cache)
 
         # chose max IG and the limit val according to max
@@ -440,29 +440,38 @@ def experiments():
 
 
 def calc_accuracy_of_forest( results, test_data ):
+    # calc majority of votes fore every test item,
+    # calc accuracy
+    correct_pred_sum = 0
 
-    return 1
+    sum_of_results = np.array(results).sum(axis=0)
+    for idx, row in enumerate(test_data):
+        prediction = 1 if sum_of_results[idx] / len(results) > 0.5 else 0
+        correct_pred_sum += 1 if row[-1] == prediction else 0
 
-def forest_comitee(train, test):
+    accuracy = correct_pred_sum / len(test_data)
+    return accuracy
+
+def forest_comitee1(train, test):
 
     train = train.to_numpy()
     test = test.to_numpy()
-    params = [(), (), ()]
+    params = [(4,2,0.01), (4,2,0.01), (4,2,0.01), (4,2,0.01), (4,2,0.01), (4,2,0.01), (4,2,0.01)]
     results = []
     for param_set in params:
         K = param_set[0]
         M = param_set[1]
         epsilon = param_set[2]
         tree = buildTree(train, K, M, epsilon, {})
-        results += get_prediction(tree, test, K)
+        results += [get_prediction(tree, test, K)]
 
     #TODO check results are as expected
-    accuracy = calc_accuracy_of_forest(results)
-    # calc majority of votes fore every test item,
-    # calc accuracy
-
-    # TODO detach prediction result of test and return it here
-    return
+    accuracy = calc_accuracy_of_forest( results, test )
+    print(accuracy)
+    return accuracy
 
 
-experiments()
+train = pd.read_csv('train_9.csv')
+test_df = pd.read_csv('test_9.csv')
+#experiments()
+forest_comitee1(train, test_df)
