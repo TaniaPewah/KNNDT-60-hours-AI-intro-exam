@@ -470,8 +470,27 @@ def forest_comitee1(train, test):
     print(accuracy)
     return accuracy
 
+def forest_comitee2(train, test):
+
+    train = train.to_numpy()
+    test = test.to_numpy()
+    params = [(4,1,0.01), (3,2,0.01), (3,3,0.01), (3,2,0.05), (4,3,0.01), (3,2,0.01), (3,3,0.05)]
+    results = []
+    for param_set in params:
+        K = param_set[0]
+        M = param_set[1]
+        epsilon = param_set[2]
+        tree = buildTree(train, K, M, epsilon, {})
+        results += [get_prediction(tree, test, K)]
+
+    #TODO check results are as expected
+    accuracy = calc_accuracy_of_forest( results, test )
+    print(accuracy)
+    return accuracy
+
 
 train = pd.read_csv('train_9.csv')
 test_df = pd.read_csv('test_9.csv')
 #experiments()
 forest_comitee1(train, test_df)
+#forest_comitee2(train, test_df)
