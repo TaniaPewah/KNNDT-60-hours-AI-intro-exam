@@ -24,7 +24,7 @@ def calc_mistake_ei(data, attribute_index, value_of_attr, K, cache, prev_values)
         prev_val = np.array(list(filter(lambda row: row[0] == temp_row[0], copy_data.transpose())))[0][attribute_index]
         temp_row[attribute_index] = prev_val
 
-    return epsilon_range_mistake(temp_data, K, cache)
+    return get_eval_mistake(temp_data, K, cache)
 
 def find_entropy_of_attribute_with_threshold(data, attribute_index, poss_limit):
     target_variables = np.unique(data[-1])  # This gives all 1 and 0
@@ -135,7 +135,7 @@ def calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, data, colu
     #for every possible threshold
     for lim_idx, poss_limit in enumerate(poss_limit_values):
         # calc weighted mistakes
-        # current_mistake = epsilon_range_mistake(data.transpose(), K)
+        # current_mistake = get_eval_mistake(data.transpose(), K)
         #print("calc_weigt_mistakes_for_all_thresholds_of_attr ", column_idx, " threshold: ", poss_limit)
         children_mistake_sum = find_mistake_of_attribute_with_threshold(data, column_idx, poss_limit, K, cache)
         weighted_mistake = children_mistake_sum
@@ -199,7 +199,7 @@ def check_class(neighbors):
     prediction = max(set(output_values), key=output_values.count)
     return prediction
 
-def epsilon_range_mistake( branch_data, K, cache):
+def get_eval_mistake(branch_data, K, cache):
 
     # no mistake if only one example in the group
     if len(branch_data) == 1:
@@ -308,7 +308,7 @@ def buildTree(data, K, M, epsilon, cache):
 
         class_vals_l, counts_l = np.unique(lower[:,-1], return_counts=True)
 
-        mistake = epsilon_range_mistake(lower, K, cache)
+        mistake = get_eval_mistake(lower, K, cache)
         # if all lower are same class - its a leaf, save all lower examples in the leaf
         if len(class_vals_l) == 1 or mistake <= epsilon or len(lower) <= M*K:
             myTree[attr_indx][0] = limit_val, lower
@@ -325,7 +325,7 @@ def buildTree(data, K, M, epsilon, cache):
         class_vals_h, counts_h = np.unique(higher[:, -1], return_counts=True)
 
         # if all higher are same class - its a leaf, save all higher examples in the leaf
-        mistake = epsilon_range_mistake(higher, K, cache)
+        mistake = get_eval_mistake(higher, K, cache)
         if len(class_vals_h) == 1 or mistake <= epsilon or len(higher) <= M * K:
             myTree[attr_indx][1] = limit_val, higher
             print("higher: ", attr_indx, " ", len(higher), "threshold: ", limit_val, "mistake: ", mistake)
@@ -336,26 +336,55 @@ def buildTree(data, K, M, epsilon, cache):
 
     return myTree
 
-def calc_accuracy( tree, test_data ):
-    test_array = test_data.to_numpy()
-    df_keys = df.keys()
-    annotated_test_item = {}
 
+def is_leaf(tree):
+    return isinstance(tree[1], np.ndarray)
+
+def find_leaf(tree, root_key, query, K, new_cache):
+
+    # TODO if tree is leaf do KNN class
+    if tree is None:
+        print("something went wrong")
+        return query[47]
+
+    lower = tree[root_key][0]
+
+    if is_leaf(lower):
+        neighbors = get_neighbors(lower[1], query, K, new_cache)
+        class_by_knn = check_class(neighbors)
+        return class_by_knn
+
+    threshold = lower[0]
+    if query[root_key] < threshold:
+        lower_key = list(lower[1].keys())[0]
+        return find_leaf(lower[1], lower_key, query, K, new_cache)
+    else:
+        higher = tree[root_key][1]
+        if is_leaf(higher):
+            neighbors = get_neighbors(higher[1], query, K, new_cache)
+            class_by_knn = check_class(neighbors)
+            return class_by_knn
+
+        higher_key = list(higher[1].keys())[0]
+        return find_leaf( higher[1], higher_key, query, K, new_cache)
+
+
+def predict(query, tree, K, new_cache):
+
+    return find_leaf(tree, list(tree.keys())[0], query, K, new_cache)
+
+
+def calc_accuracy( tree, test_data, K ):
+    test_array = test_data.to_numpy()
     correct_pred_sum = 0
-    # Adding row to numpy array
+    new_cache = {}
 
     for idx, row in enumerate(test_array):
-        for key_idx, attr in enumerate(df_keys):
-            annotated_test_item[attr] = row[key_idx]
 
-        print(annotated_test_item)
-        predicted = predict(annotated_test_item, tree)
-        correct_pred_sum += 1 if annotated_test_item['diagnosis'] == predicted else 0
-
-        annotated_test_data = {}
+        predicted = predict(row, tree, K, new_cache)
+        correct_pred_sum += 1 if row[47] == predicted else 0
 
     accuracy = correct_pred_sum / len(test_array)
-
     print(accuracy)
 
 df = pd.read_csv('train_9.csv')
@@ -364,10 +393,10 @@ df_array = df.to_numpy()
 
 
 #entropy = find_entropy(df_array)
-minmax_list = dataset_minmax(df_array)
-normalized = normalize_dataset(df_array, minmax_list)
-tree = buildTree( normalized, 4, 3, 0.07, {} )
+#minmax_list = dataset_minmax(df_array)
+#normalized = normalize_dataset(df_array, minmax_list)
+tree = buildTree( df_array, 4, 3, 0.05, {} )
 
 test_df = pd.read_csv('test_9.csv')
-calc_accuracy(tree, test_df)
+calc_accuracy(tree, test_df, 4)
 
