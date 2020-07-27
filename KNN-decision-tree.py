@@ -2,6 +2,7 @@ from math import log
 import numpy as np
 import pandas as pd
 from math import sqrt
+import random
 import copy
 eps = np.finfo(float).eps
 
@@ -120,6 +121,7 @@ def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, 
 
         #temp_data = np.array(list(filter(lambda row: row[attribute_index] < poss_limit, data.transpose())))
         mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K, cache,  prev_values)
+        #TODO check sum_entr
         sum_entr += (denum / len(data[0])) * (1 - mistake_Ei)
 
     data[attribute_index] = prev_values
@@ -172,10 +174,13 @@ def find_winner(data, K, cache):
     if len(sorted_attr_weighted_mistakes) == 1:
         return sorted_attr_weighted_mistakes[0][0], sorted_attr_weighted_mistakes[0][1]
 
-    attr_idx_to_return = sorted_attr_weighted_mistakes[-1][0]
-    limit_val = sorted_attr_weighted_mistakes[-1][1]
+    best_result = sorted_attr_weighted_mistakes[-1][2]
+    poss_winners = np.array(list(filter(lambda row: row[2] == best_result, sorted_attr_weighted_mistakes)))
+    winner = random.choice(poss_winners)
+    limit_val = winner[1]
+    attr_idx_to_return = winner[0]
 
-    return attr_idx_to_return, limit_val
+    return int(attr_idx_to_return), limit_val
 
 
 def classify_vals_transposed(data, attr_index, limit_val):
@@ -290,7 +295,7 @@ def buildTree(data, K, M, epsilon, cache):
     attr_indx, limit_val = find_winner(data, K, cache)
     print("winner is: ", attr_indx)
 
-    lower, higher = classify_vals_transposed(data, attr_indx, limit_val)
+    lower, higher = classify_vals_transposed(data, int(attr_indx), limit_val)
 
     myTree = {attr_indx: {}}
 
@@ -331,6 +336,27 @@ def buildTree(data, K, M, epsilon, cache):
 
     return myTree
 
+def calc_accuracy( tree, test_data ):
+    test_array = test_data.to_numpy()
+    df_keys = df.keys()
+    annotated_test_item = {}
+
+    correct_pred_sum = 0
+    # Adding row to numpy array
+
+    for idx, row in enumerate(test_array):
+        for key_idx, attr in enumerate(df_keys):
+            annotated_test_item[attr] = row[key_idx]
+
+        print(annotated_test_item)
+        predicted = predict(annotated_test_item, tree)
+        correct_pred_sum += 1 if annotated_test_item['diagnosis'] == predicted else 0
+
+        annotated_test_data = {}
+
+    accuracy = correct_pred_sum / len(test_array)
+
+    print(accuracy)
 
 df = pd.read_csv('train_9.csv')
 df_array = df.to_numpy()
@@ -340,4 +366,8 @@ df_array = df.to_numpy()
 #entropy = find_entropy(df_array)
 minmax_list = dataset_minmax(df_array)
 normalized = normalize_dataset(df_array, minmax_list)
-tree = buildTree( normalized, 4, 3, 0.01, {} )
+tree = buildTree( normalized, 4, 3, 0.07, {} )
+
+test_df = pd.read_csv('test_9.csv')
+calc_accuracy(tree, test_df)
+
