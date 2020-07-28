@@ -121,10 +121,9 @@ def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, 
 
         mistake_Ei = calc_mistake_ei(data, attribute_index, value_of_attr, K, cache,  prev_values)
         #TODO check sum_entr
-        sum_entr += denum * (1 - mistake_Ei)
+        sum_entr += (denum / len(data[0])) * (1 - mistake_Ei)
 
     data[attribute_index] = prev_values
-    print(sum_entr)
     return sum_entr
 
 
@@ -152,8 +151,8 @@ def calc_weigh_mistakes(data, K, cache):
 
         #rand = random.randrange(100)
         #poss_limit_values = np.percentile(transpose_data[column_idx], [rand])
-        #poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
-        poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
+        poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
+        #poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
         res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K, cache)
 
         # chose max IG and the limit val according to max
@@ -177,6 +176,7 @@ def find_winner(data, K, cache):
         return sorted_attr_weighted_mistakes[0][0], sorted_attr_weighted_mistakes[0][1]
 
     best_result = sorted_attr_weighted_mistakes[-1][2]
+    print("highest accuracy: ", best_result )
     poss_winners = np.array(list(filter(lambda row: row[2] == best_result, sorted_attr_weighted_mistakes)))
     winner = random.choice(poss_winners)
     limit_val = winner[1]
@@ -196,15 +196,11 @@ def classify_vals_transposed(data, attr_index, limit_val):
             higher.append(row)
     return np.array(lower), np.array(higher)
 
-def check_class(neighbors, data):
+def check_class(neighbors):
     if len(neighbors) == 0:
         print("WHY AM I HERE")
         return 0
-    output_values = []
-    for neigb in neighbors:
-        output_values += [list(filter(lambda row: row[0] == neigb, data))[0][-1]]
-
-    #output_values = [neighbor[-1] for neighbor in neighbors]
+    output_values = [neighbor[-1] for neighbor in neighbors]
     prediction = max(set(output_values), key=output_values.count)
     return prediction
 
@@ -218,7 +214,7 @@ def get_eval_mistake(branch_data, K, cache):
     wrong_classes = 0
     for row in branch_data:
         neighbors = get_neighbors(branch_data, row, K, cache)
-        class_by_knn = check_class(neighbors, branch_data)
+        class_by_knn = check_class(neighbors)
         wrong_classes += 0 if class_by_knn == row[-1] else 1
 
     return wrong_classes / len(branch_data)
@@ -260,15 +256,17 @@ def get_neighbors(data, test_row, num_neighbors, cache):
 
     for train_row in data:
         dist = euclidean_distance(test_row, train_row, cache)
-        dists.append((train_row[0], dist))
+        dists.append((train_row, dist))
 
     dists.sort(key=lambda tup: tup[1])
     neighbors = list()
 
-    num_neighbors = data.shape[0] - 1 if num_neighbors >= data.shape[0] else num_neighbors
+    num_neighbors = data.shape[0] if num_neighbors >= data.shape[0] else num_neighbors
 
-    #cut myself off
-    dists = dists[1:]
+    #cut myself off if its me
+    if dists[0][-1] == 0:
+        num_neighbors = data.shape[0] - 1 if num_neighbors >= data.shape[0] else num_neighbors
+        dists = dists[1:]
 
     for i in range(0, num_neighbors):
         neighbors.append(dists[i][0])
@@ -292,7 +290,7 @@ def euclidean_distance(row1, row2, distances):
     key2 = str(int(row2[0])) + " " + str(int(row1[0]))
     distances[key] = distance
     distances[key2] = distance
-    return sqrt(distance)
+    return distance
 
 def buildTree(data, K, M, epsilon, cache):
 
@@ -418,27 +416,26 @@ def KNN_build_and_test( train, test, K, M, epsilon):
     return calc_accuracy(tree, test, K)
 
 def experiments():
-    Ks = [3,5,7,10]
+    Ks = [ 2, 4, 6, 8, 10]
     Ms = [1, 2, 3, 4, 5]
     default_K = 4
     default_M = 2
     default_eps = 0.01
     accuracies = []
 
-
-    train = pd.read_csv('train_9.csv')
-    test_df = pd.read_csv('test_9.csv')
+    train = pd.read_csv('train_12.csv')
+    test_df = pd.read_csv('test_12.csv')
 
     for k in Ks:
 
         accuracy = KNN_build_and_test(train, test_df, k, default_M, default_eps)
         accuracies.append(accuracy)
-        print(k, ' NN accuracy:', accuracy)
+        print(k, ' K accuracy:', accuracy)
 
     # Plot results:
-    plt.plot(Ks, accuracies)
+    plt.scatter(Ks, accuracies)
     plt.title('KNN Accuracies')
-    plt.xlabel('N')
+    plt.xlabel('K')
     plt.ylabel('Accuracies(%)')
     plt.show()
 
@@ -461,7 +458,7 @@ def forest_comitee1(train, test):
 
     train = train.to_numpy()
     test = test.to_numpy()
-    params = [(20,2,0.01), (4,2,0.01), (4,2,0.01)]
+    params = [(4,2,0.01), (4,2,0.01), (4,2,0.01)]
     results = []
     for param_set in params:
         K = param_set[0]
