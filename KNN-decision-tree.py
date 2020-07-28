@@ -415,29 +415,88 @@ def KNN_build_and_test( train, test, K, M, epsilon):
     tree = buildTree(train, K, M, epsilon, {})
     return calc_accuracy(tree, test, K)
 
+
+def plot_accuracies(results, labels ):
+    labels = [str(label) for label in labels]
+    first_run = results[0]
+    second_run = results[1]
+    third_run = results[2]
+
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
+
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x - width/3, first_run, width/3, label='1st run')
+    rects2 = ax.bar(x , second_run, width/3, label='2nd run')
+    rects3 = ax.bar(x + width/3, third_run, width/3, label='3rd run')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Accuracies')
+    ax.set_title('Accuracies by K values')
+    ax.set_xlabel('K values')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    def autolabel(rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(height),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+
+
+    autolabel(rects1)
+    autolabel(rects2)
+    autolabel(rects3)
+
+    fig.tight_layout()
+
+    plt.show()
+
+    # fig = plt.figure()
+    # columns = results.shape[1]
+    # nrows, ncols = 5, 2
+    #
+    # x = [row[0] for row in results]  # same as [row[0] for row in data], and doesn't change in loop, so only do it once.
+    # for m in range(1, columns+1):  # this loops from 1 through columns
+    #     y = [row[m] for row in results]
+    #     ax = fig.add_subplot(nrows, ncols, m, axisbg='w')
+    #     ax.plot(x, y, lw=1.3)
+    #
+    # plt.show()
+
+
 def experiments():
-    Ks = [ 2, 4, 6, 8, 10]
+    Ks = [2, 4, 6, 8, 10]
     Ms = [1, 2, 3, 4, 5]
     default_K = 4
     default_M = 2
     default_eps = 0.01
     accuracies = []
 
-    train = pd.read_csv('train_12.csv')
-    test_df = pd.read_csv('test_12.csv')
+    train = pd.read_csv('train_9.csv')
+    test_df = pd.read_csv('test_9.csv')
+    results_for_graph = []
 
-    for k in Ks:
+    for i in range(3):
+        for k in Ks:
 
-        accuracy = KNN_build_and_test(train, test_df, k, default_M, default_eps)
-        accuracies.append(accuracy)
-        print(k, ' K accuracy:', accuracy)
+            accuracy = KNN_build_and_test(train, test_df, k, default_M, default_eps)
+            accuracies.append(accuracy)
+            print(k, ' K accuracy:', accuracy)
 
-    # Plot results:
-    plt.scatter(Ks, accuracies)
-    plt.title('KNN Accuracies')
-    plt.xlabel('K')
-    plt.ylabel('Accuracies(%)')
-    plt.show()
+
+        results_for_graph += [accuracies]
+        accuracies = []
+
+    plot_accuracies(np.array(results_for_graph), Ks)
+
+
 
 
 
@@ -493,6 +552,7 @@ def forest_comitee2(train, test):
 
 train = pd.read_csv('train_9.csv')
 test_df = pd.read_csv('test_9.csv')
+
 experiments()
 #forest_comitee1(train, test_df)
 #forest_comitee2(train, test_df)
