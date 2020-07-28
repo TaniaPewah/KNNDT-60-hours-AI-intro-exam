@@ -8,11 +8,6 @@ eps = np.finfo(float).eps
 
 
 
-def calc_ent_ei(data, attribute_index, value_of_attr):
-
-    temp_data = np.array(list(filter(lambda row: row[attribute_index] == value_of_attr, data.transpose())))
-    return find_entropy(temp_data.transpose())
-
 def calc_mistake_ei(data, attribute_index, value_of_attr, K, cache, prev_values):
 
     transposed = copy.deepcopy(data.transpose())
@@ -26,82 +21,6 @@ def calc_mistake_ei(data, attribute_index, value_of_attr, K, cache, prev_values)
 
     return get_eval_mistake(temp_data, K, cache)
 
-def find_entropy_of_attribute_with_threshold(data, attribute_index, poss_limit):
-    target_variables = np.unique(data[-1])  # This gives all 1 and 0
-    # save attribute values for later
-    prev_values = data[attribute_index].copy()
-
-    for sample_index in range(0, len(data[attribute_index])):
-        data[attribute_index][sample_index] = 0 if poss_limit > data[attribute_index][sample_index] else 1
-    # This gives different binary values of chosen attribute after classification
-    variables = np.unique(data[attribute_index][1:])
-
-    sum_entr = 0
-
-    # foe every possible value of this attr, calc its entropy Ei and put in entropies_of_sons
-    for idx, value_of_attr in enumerate(variables):
-        denum = np.count_nonzero(data[attribute_index] == value_of_attr)
-
-        ent_Ei = calc_ent_ei(data, attribute_index, value_of_attr)
-        sum_entr += (denum / len(data[0])) * ent_Ei
-
-    data[attribute_index] = prev_values
-
-    return abs(sum_entr)
-
-def find_entropy(data):
-
-    entropy = 0
-    values = np.unique(data[-1])
-
-    for value in values:
-        fraction = np.count_nonzero(data[-1] == value) / len(data[-1])
-        entropy += -fraction * np.log2(fraction)
-    return entropy
-
-def find_averages_for_attr(sort_arr):
-    poss_limit_values = []
-    for idx, val in enumerate(sort_arr):
-        if idx == len(sort_arr) - 1:
-            continue
-        poss_limit_values += [(val + sort_arr[idx + 1]) / 2]
-
-    return poss_limit_values
-
-
-def calc_IG_all_limit_vals_of_attr(poss_limit_values, data, column_idx):
-    ig_vec =[]
-
-    #for every possible threshold
-    for lim_idx, poss_limit in enumerate(poss_limit_values):
-        # calc IG = according to slide number 70(?)
-        all_ent = find_entropy(data)
-        other_ent = find_entropy_of_attribute_with_threshold(data, column_idx, poss_limit)
-        ig = all_ent - other_ent
-        ig_vec.append(ig)
-    return ig_vec
-
-def calc_all_IG(data):
-    transpose_data = data.transpose()
-    final_attr_and_limit_vals = []
-
-    # for every column of data (for every attr)
-    # calc best threshold and IG for this threshold
-    for column_idx in range(1,len(transpose_data)-1):
-
-        sort_arr = sorted(transpose_data[column_idx])
-
-        # find k-1 averages (limit values) for every i, i+1 values
-        poss_limit_values = find_averages_for_attr(sort_arr)
-        ig_vec = calc_IG_all_limit_vals_of_attr(poss_limit_values, transpose_data, column_idx)
-
-        # chose max IG and the limit val according to max
-        max_ig_indx, max_ig = ig_vec.index(max(ig_vec)), max(ig_vec)  # get also index
-        chosen_limit_val = poss_limit_values[max_ig_indx]  # should insert the best limit val corresponding to the max ig
-        final_attr_and_limit_vals += [(column_idx, chosen_limit_val, max_ig)]
-
-        # sort the data by this attr
-    return final_attr_and_limit_vals
 
 def find_mistake_of_attribute_with_threshold(data, attribute_index, poss_limit, K, cache):
     target_variables = np.unique(data[-1])  # This gives all 1 and 0
@@ -151,8 +70,8 @@ def calc_weigh_mistakes(data, K, cache):
 
         #rand = random.randrange(100)
         #poss_limit_values = np.percentile(transpose_data[column_idx], [rand])
-        poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
-        #poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
+        #poss_limit_values = np.percentile(transpose_data[column_idx], [12.5, 25, 37.5, 50, 62.5, 75, 87.5])
+        poss_limit_values = np.percentile(transpose_data[column_idx], [25,  50, 75])
         res_vec = calc_weigt_mistakes_for_all_thresholds_of_attr(poss_limit_values, transpose_data, column_idx, K, cache)
 
         # chose max IG and the limit val according to max
@@ -294,14 +213,13 @@ def euclidean_distance(row1, row2, distances):
 
 def buildTree(data, K, M, epsilon, cache):
 
-    #TODO check its NP
     #Create a list of results for the training data example classes
     classList = [example[-1] for example in data]
 
     # If all training data belongs to a category, return to the category
     if classList.count(classList[0]) == len(classList):   return classList[0]
 
-    # Get attribute with maximum information gain
+    # Get attribute with maximum accuracy gain
     attr_indx, limit_val = find_winner(data, K, cache)
     print("winner is: ", attr_indx)
 
@@ -351,11 +269,6 @@ def is_leaf(tree):
     return isinstance(tree[1], np.ndarray)
 
 def find_leaf(tree, root_key, query, K, new_cache):
-
-    # TODO if tree is leaf do KNN class
-    if tree is None:
-        print("something went wrong")
-        return query[47]
 
     lower = tree[root_key][0]
 
@@ -409,10 +322,10 @@ def calc_accuracy( tree, test_data, K):
     return accuracy
 
 
-def KNN_build_and_test( train, test, K, M, epsilon):
+def KNN_build_and_test( train, test, K, M, epsilon, cache):
     train = train.to_numpy()
     test = test.to_numpy()
-    tree = buildTree(train, K, M, epsilon, {})
+    tree = buildTree(train, K, M, epsilon, cache)
     return calc_accuracy(tree, test, K)
 
 
@@ -432,8 +345,8 @@ def plot_accuracies(results, labels ):
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('Accuracies')
-    ax.set_title('Accuracies by K values')
-    ax.set_xlabel('K values')
+    ax.set_title('Accuracies by M values')
+    ax.set_xlabel('M values')
 
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
@@ -471,22 +384,19 @@ def plot_accuracies(results, labels ):
     # plt.show()
 
 
-def experiments():
-    Ks = [2, 4, 6, 8, 10]
-    Ms = [1, 2, 3, 4, 5]
-    default_K = 4
+def experimentsKs(train, test_df):
+    Ks = [1, 3, 5, 7, 9]
     default_M = 2
     default_eps = 0.01
     accuracies = []
+    cache = {}
 
-    train = pd.read_csv('train_9.csv')
-    test_df = pd.read_csv('test_9.csv')
     results_for_graph = []
 
     for i in range(3):
         for k in Ks:
 
-            accuracy = KNN_build_and_test(train, test_df, k, default_M, default_eps)
+            accuracy = KNN_build_and_test(train, test_df, k, default_M, default_eps, cache)
             accuracies.append(accuracy)
             print(k, ' K accuracy:', accuracy)
 
@@ -497,62 +407,37 @@ def experiments():
     plot_accuracies(np.array(results_for_graph), Ks)
 
 
+def experimentsMs(train, test_df):
+
+    Ms = [1, 2, 3, 4, 5]
+    default_K = 7
+    default_eps = 0.01
+    accuracies = []
+    cache = {}
+
+    results_for_graph = []
+
+    for i in range(3):
+        for m in Ms:
+
+            accuracy= KNN_build_and_test(train, test_df, default_K, m, default_eps, cache)
+            accuracies.append(accuracy)
+            print(m, ' M accuracy:', accuracy)
 
 
+        results_for_graph += [accuracies]
+        accuracies = []
 
-def calc_accuracy_of_forest( results, test_data ):
-    # calc majority of votes fore every test item,
-    # calc accuracy
-    correct_pred_sum = 0
-
-    sum_of_results = np.array(results).sum(axis=0)
-    for idx, row in enumerate(test_data):
-        prediction = 1 if sum_of_results[idx] / len(results) > 0.5 else 0
-        correct_pred_sum += 1 if row[-1] == prediction else 0
-
-    accuracy = correct_pred_sum / len(test_data)
-    return accuracy
-
-def forest_comitee1(train, test):
-
-    train = train.to_numpy()
-    test = test.to_numpy()
-    params = [(4,2,0.01), (4,2,0.01), (4,2,0.01)]
-    results = []
-    for param_set in params:
-        K = param_set[0]
-        M = param_set[1]
-        epsilon = param_set[2]
-        tree = buildTree(train, K, M, epsilon, {})
-        results += [get_prediction(tree, test, K)]
-
-    #TODO check results are as expected
-    accuracy = calc_accuracy_of_forest( results, test )
-    print(accuracy)
-    return accuracy
-
-def forest_comitee2(train, test):
-
-    train = train.to_numpy()
-    test = test.to_numpy()
-    params = [(4,1,0.01), (3,2,0.01), (3,3,0.01), (3,2,0.05), (4,3,0.01), (3,2,0.01), (3,3,0.05)]
-    results = []
-    for param_set in params:
-        K = param_set[0]
-        M = param_set[1]
-        epsilon = param_set[2]
-        tree = buildTree(train, K, M, epsilon, {})
-        results += [get_prediction(tree, test, K)]
-
-    #TODO check results are as expected
-    accuracy = calc_accuracy_of_forest( results, test )
-    print(accuracy)
-    return accuracy
+    plot_accuracies(np.array(results_for_graph), Ms)
 
 
 train = pd.read_csv('train_9.csv')
 test_df = pd.read_csv('test_9.csv')
 
-experiments()
-#forest_comitee1(train, test_df)
-#forest_comitee2(train, test_df)
+experimentsMs(train, test_df)
+experimentsKs(train, test_df)
+train = pd.read_csv('train_12.csv')
+test_df = pd.read_csv('test_12.csv')
+
+experimentsMs(train, test_df)
+experimentsKs(train, test_df)
